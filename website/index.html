@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Pantry</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+      <!-- <h1>Welcome to Pixel Pantry</h1> -->
+  </header>
+  <main>
+    <div id="toolbar">
+      <label for="colorPicker">Choose Color:</label>
+      <div id="colorDisplay"><!--  Color options added here  --></div>
+    </div>
+    <button id="saveButton" disabled>Save 0/10 Pixels</button>
+    <canvas id="pixelCanvas" width="1000" height="1000"></canvas>
+  </main>
+</body>
+<script>
+const canvas = document.getElementById('pixelCanvas');
+const ctx = canvas.getContext('2d');
+const GRID_SIZE = 100;
+const PIXEL_SIZE = canvas.width / GRID_SIZE;
+
+
+let hoveredPixel = null; // Hover pixel tracking
+let selectedColor = '#000000'; // color to draw, default black
+let totalPainted = 0; // Total pixels painted, out of 10 limit
+
+
+// Example: Fill the canvas with a grid of pixels
+drawPixel = (x, y, color) => {
+  ctx.fillStyle = color;
+  ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+  
+}
+
+  // Initialize grid
+const grid = Array(GRID_SIZE).fill(null).map(() => 
+  Array(GRID_SIZE).fill('#FFFFFF') // default white
+)
+
+// Load from DataPantry on init
+async function loadCanvas() {
+  const pixels = await fetch('/api/pixels').then(r => r.json())
+  pixels.forEach(pixel => {
+    grid[pixel.y][pixel.x] = pixel.color
+  })
+  redrawCanvas()
+}
+
+// Redraw entire canvas
+function redrawCanvas() {
+  grid.forEach((row, y) => {
+    row.forEach((color, x) => {
+      drawPixel(x, y, color)
+    })
+  })
+}
+
+
+//  hover effect
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect()
+  const x = Math.floor((e.clientX - rect.left) / PIXEL_SIZE)
+  const y = Math.floor((e.clientY - rect.top) / PIXEL_SIZE)
+  
+  if (hoveredPixel?.x !== x || hoveredPixel?.y !== y) {
+    // Redraw old hovered pixel (remove outline)
+    if (hoveredPixel) {
+      drawPixel(hoveredPixel.x, hoveredPixel.y, grid[hoveredPixel.y][hoveredPixel.x])
+    }
+    
+    // Draw new hover outline
+    hoveredPixel = { x, y }
+    drawPixel(x, y, grid[y][x])
+    ctx.strokeStyle = '#000000'
+    ctx.lineWidth = 2
+    ctx.strokeRect(x * PIXEL_SIZE + 1, y * PIXEL_SIZE + 1, PIXEL_SIZE-2, PIXEL_SIZE-2)
+  }
+})
+
+// mouse out
+canvas.addEventListener('mouseout', (e) => {
+  if (hoveredPixel) {
+    drawPixel(hoveredPixel.x, hoveredPixel.y, grid[hoveredPixel.y][hoveredPixel.x])
+    hoveredPixel = null;
+  }
+});
+
+//  draw on click
+canvas.addEventListener('click', async (e) => {
+  if (!hoveredPixel || totalPainted >= 10) return;
+  const { x, y } = hoveredPixel;
+  grid[y][x] = selectedColor;
+  drawPixel(x, y, selectedColor);
+  totalPainted++;
+  if (totalPainted >= 10) {
+    document.getElementById('saveButton').disabled = true;
+  } else {
+    document.getElementById('saveButton').disabled = false;
+  }
+  document.getElementById('saveButton').innerText = `Save ${totalPainted}/10 Pixels`;
+  return;
+  // Save to DataPantry
+  await fetch('/api/pixels', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ x, y, color: selectedColor })
+  });
+});
+
+// Get an array of colors for the color options
+function getColorArray() {
+  const colors = [];
+  for (let l = 0; l <= 100; l += 20) {   // 6 Grays
+    colors.push(`hsl(0, 0%, ${l}%)`);
+  }
+  for (let h = 0; h < 360; h += 60) { //  6 Hues
+    for (let s = 100; s >= 20; s -= 40) {  // 3 Saturations
+      for (let l = 25; l <= 80; l += 25) {   // 3 Lightness
+        colors.push(`hsl(${h}, ${s}%, ${l}%)`);
+      }
+    }
+  }
+  return colors;
+
+}
+
+function populateColorOptions() {
+  const colorDisplay = document.getElementById('colorDisplay')
+  colorDisplay.innerHTML = '' // clear existing
+  const colors = getColorArray();
+  colors.forEach(color => {
+    const colorDiv = document.createElement('div')
+    colorDiv.className = 'colorOption'
+    colorDiv.className += (color === selectedColor) ? ' selected' : ''
+    colorDiv.style.backgroundColor = color
+    colorDiv.addEventListener('click', () => {
+      selectedColor = color
+      populateColorOptions() // refresh to show selected
+    })
+
+    colorDisplay.appendChild(colorDiv)
+  })
+}
+
+function mount() {
+  // loadCanvas()
+  redrawCanvas();
+  populateColorOptions();
+}
+mount();
+</script>
+</html>

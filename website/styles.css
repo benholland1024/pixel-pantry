@@ -1,0 +1,71 @@
+body {
+  background: #112255;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100vh;
+}
+
+header {
+  position: absolute;
+}
+
+main {
+  position: relative;
+  height: 100vh;
+}
+
+#toolbar {
+  position: absolute;
+  top: 70px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 10px;
+  border-radius: 5px;
+}
+
+#colorDisplay {
+  margin-top: 10px;
+  display: flex;
+  flex-flow: row wrap;
+  width: 100px;
+  justify-content: space-around;
+}
+
+.colorOption {
+  width: 25px;
+  height: 25px;
+  display: inline-block;
+  margin: 2px;
+  cursor: pointer;
+}
+.colorOption.selected {
+  outline: 2px solid gray;
+}
+
+canvas {
+  cursor: none;
+}
+
+#saveButton {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  background-color: #4444aa;
+  color: white;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+}
+#saveButton:hover:not(:disabled) {
+  background-color: #6666cc;
+}
+#saveButton:disabled {
+  background-color: #9898ac;
+  cursor: not-allowed;
+}
