@@ -10,7 +10,9 @@ app.listen(3000, () => {
 })
 
 app.post('/save-pixel', (req, res) => {
-  const { x, y, color } = req.body
-  console.log(`Pixel saved at (${x}, ${y}) with color ${color}`)
-  res.status(200).send('Pixel saved')
+  const { pixels } = req.body
+  pixels.forEach((pixel) => {
+    console.log(`Saved pixel: `, pixel)
+  })
+  res.status(200).send('Pixels saved')
 })

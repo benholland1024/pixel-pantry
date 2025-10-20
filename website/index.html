@@ -15,7 +15,7 @@
       <label for="colorPicker">Choose Color:</label>
       <div id="colorDisplay"><!--  Color options added here  --></div>
     </div>
-    <button id="saveButton" disabled>Save 0/10 Pixels</button>
+    <button id="saveButton" disabled onclick="savePixels()">Save 0/10 Pixels</button>
     <canvas id="pixelCanvas" width="1000" height="1000"></canvas>
   </main>
 </body>
@@ -29,6 +29,7 @@ const PIXEL_SIZE = canvas.width / GRID_SIZE;
 let hoveredPixel = null; // Hover pixel tracking
 let selectedColor = '#000000'; // color to draw, default black
 let totalPainted = 0; // Total pixels painted, out of 10 limit
+let timeout = 0;
 
 
 // Example: Fill the canvas with a grid of pixels
@@ -93,25 +94,44 @@ canvas.addEventListener('mouseout', (e) => {
 
 //  draw on click
 canvas.addEventListener('click', async (e) => {
-  if (!hoveredPixel || totalPainted >= 10) return;
+  if (!hoveredPixel || totalPainted >= 10 || timeout > 0) return;
   const { x, y } = hoveredPixel;
   grid[y][x] = selectedColor;
   drawPixel(x, y, selectedColor);
   totalPainted++;
-  if (totalPainted >= 10) {
-    document.getElementById('saveButton').disabled = true;
-  } else {
-    document.getElementById('saveButton').disabled = false;
-  }
+  document.getElementById('saveButton').disabled = false;
+
   document.getElementById('saveButton').innerText = `Save ${totalPainted}/10 Pixels`;
   return;
   // Save to DataPantry
-  await fetch('/api/pixels', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ x, y, color: selectedColor })
-  });
+  
 });
+
+async function savePixels() {
+  document.getElementById('saveButton').innerText = `Saving...`;
+  timeout = 5 * 60; // 5 minutes in seconds
+  await fetch('/save-pixel', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      pixels: grid.flatMap((row, y) => row.map((color, x) => ({ x, y, color }))).filter(pixel => pixel.color !== '#FFFFFF')
+    })
+  });
+  totalPainted = 0;
+  document.getElementById('saveButton').innerText = `Saved! Wait 5:00 min`;
+  document.getElementById('saveButton').disabled = true;
+  let countdown = setInterval(() => {
+    timeout--;
+    document.getElementById('saveButton').innerText = `Saved! Wait ${Math.floor(timeout / 60)}:${(timeout % 60).toString().padStart(2, '0')} min`;
+    if (timeout <= 0) {
+      document.getElementById('saveButton').innerText = `Save 0/10 Pixels`;
+      document.getElementById('saveButton').disabled = false;
+      clearInterval(countdown);
+    }
+  }, 1000); // 1 second
+} 
 
 // Get an array of colors for the color options
 function getColorArray() {
