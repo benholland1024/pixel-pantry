@@ -7,11 +7,13 @@ const app = express()
 
 dotenv.config({ path: './.env' })
 
+const PORT = process.env.PORT || 3002  // Read from env or default to 3002
+
 app.use(express.static('website'))
 app.use(express.json())
 
-app.listen(3000, () => {
-  console.log('Server is running on http://localhost:3002')
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`)
 })
 
 import DataPantry, { eq, gt } from 'datapantry';
