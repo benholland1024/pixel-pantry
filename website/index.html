@@ -15,7 +15,10 @@
       <label for="colorPicker">Choose Color:</label>
       <div id="colorDisplay"><!--  Color options added here  --></div>
     </div>
-    <button id="saveButton" disabled onclick="savePixels()">Save 0/10 Pixels</button>
+    <button id="saveButton" disabled onclick="savePixels()">Loading...</button>
+    <button id="cancelButton" onclick="cancelPixels()" style="display: none;">
+      &#10006;<!--  ✖  -->
+    </button>
     <canvas id="pixelCanvas" width="1000" height="1000"></canvas>
   </main>
 </body>
@@ -27,39 +30,61 @@ const PIXEL_SIZE = canvas.width / GRID_SIZE;
 
 
 let hoveredPixel = null; // Hover pixel tracking
-let selectedColor = '#000000'; // color to draw, default black
+let selectedColor = `hsl(0, 0%, 0%)`; // color to draw, default black
 let totalPainted = 0; // Total pixels painted, out of 10 limit
 let timeout = 0;
+let userPixels = []; // pixels painted by user
+let saved = false; // recently saved by the user
 
+// Initialize grid
+let grid = [];
+for (let y = 0; y < GRID_SIZE; y++) {
+  for (let x = 0; x < GRID_SIZE; x++) {
+    grid.push({
+      x: x,
+      y: y,
+      color: '#FFFFFF' // default white
+    })
+  }
+}
 
-// Example: Fill the canvas with a grid of pixels
+// Draw a pixel on the canvas
 drawPixel = (x, y, color) => {
   ctx.fillStyle = color;
   ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
-  
 }
 
-  // Initialize grid
-const grid = Array(GRID_SIZE).fill(null).map(() => 
-  Array(GRID_SIZE).fill('#FFFFFF') // default white
-)
+// Get pixel color at coordinates
+function getPixelColor(x, y) {
+  const userPixel = userPixels.find(p => p.x === x && p.y === y);
+  if (userPixel) {
+    return userPixel.color;
+  }
+  const gridPixel = grid.find(p => p.x === x && p.y === y);
+  return gridPixel ? gridPixel.color : -1;
+}
 
 // Load from DataPantry on init
 async function loadCanvas() {
-  const pixels = await fetch('/api/pixels').then(r => r.json())
-  pixels.forEach(pixel => {
-    grid[pixel.y][pixel.x] = pixel.color
+  const res = await fetch('/api/load-pixels').then(r => r.json())
+  console.log('Loaded pixel data:', res.pixels.length, 'records. Sample:', res.pixels.slice(0, 5));
+  console.log('User wait time (seconds):', res.waitTime);
+  res.pixels.forEach(pixel => {
+    const index = grid.findIndex(p => p.x === pixel.x && p.y === pixel.y);
+    if (index !== -1) {
+      grid[index].color = pixel.color;
+    }
   })
-  redrawCanvas()
+  timeout = res.waitTime || 0;
+  redrawCanvas();
+  startTimeoutTimer();
 }
 
 // Redraw entire canvas
 function redrawCanvas() {
-  grid.forEach((row, y) => {
-    row.forEach((color, x) => {
-      drawPixel(x, y, color)
-    })
-  })
+  grid.forEach(pixel => {
+    drawPixel(pixel.x, pixel.y, pixel.color);
+  });
 }
 
 
@@ -71,13 +96,23 @@ canvas.addEventListener('mousemove', (e) => {
   
   if (hoveredPixel?.x !== x || hoveredPixel?.y !== y) {
     // Redraw old hovered pixel (remove outline)
+    let color = getPixelColor(x, y);
     if (hoveredPixel) {
-      drawPixel(hoveredPixel.x, hoveredPixel.y, grid[hoveredPixel.y][hoveredPixel.x])
+      let userPixel = userPixels.find(p => p.x === hoveredPixel.x && p.y === hoveredPixel.y);
+      if (userPixel) {
+        drawPixel(hoveredPixel.x, hoveredPixel.y, userPixel.color)
+      } else {
+        let gridIndex = grid.findIndex(p => p.x === hoveredPixel.x && p.y === hoveredPixel.y);
+        if (gridIndex === -1) return; // out of bounds
+        drawPixel(hoveredPixel.x, hoveredPixel.y, grid[gridIndex].color)
+      }
     }
     
     // Draw new hover outline
     hoveredPixel = { x, y }
-    drawPixel(x, y, grid[y][x])
+    let gridIndex = grid.findIndex(p => p.x === x && p.y === y);
+    if (gridIndex === -1) return; // out of bounds
+    drawPixel(x, y, grid[gridIndex].color)
     ctx.strokeStyle = '#000000'
     ctx.lineWidth = 2
     ctx.strokeRect(x * PIXEL_SIZE + 1, y * PIXEL_SIZE + 1, PIXEL_SIZE-2, PIXEL_SIZE-2)
@@ -96,42 +131,67 @@ canvas.addEventListener('mouseout', (e) => {
 canvas.addEventListener('click', async (e) => {
   if (!hoveredPixel || totalPainted >= 10 || timeout > 0) return;
   const { x, y } = hoveredPixel;
-  grid[y][x] = selectedColor;
+  userPixels.push({ x, y, color: selectedColor });
   drawPixel(x, y, selectedColor);
   totalPainted++;
   document.getElementById('saveButton').disabled = false;
-
   document.getElementById('saveButton').innerText = `Save ${totalPainted}/10 Pixels`;
+  document.getElementById('cancelButton').style.display = 'flex';
   return;
   // Save to DataPantry
   
 });
 
+// Start timeout timer
+function startTimeoutTimer() {
+  let countdown = setInterval(() => {
+    timeout--;
+    if (timeout <= 0) {
+      document.getElementById('saveButton').innerText = `Save 0/10 Pixels`;
+      clearInterval(countdown);
+      saved = false;
+    } else {
+      document.getElementById('saveButton').innerText = `${saved ? 'Saved!' : ''} Wait ${Math.floor(timeout / 60)}:${(timeout % 60).toString().padStart(2, '0')} min`;
+    }
+  }, 1000); // 1 second
+}
+
+// Save pixels to server
 async function savePixels() {
   document.getElementById('saveButton').innerText = `Saving...`;
+  console.log('Saving pixels:', userPixels);
+  // return;
   timeout = 5 * 60; // 5 minutes in seconds
-  await fetch('/save-pixel', {
+  const response = await fetch('/api/save-pixel', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      pixels: grid.flatMap((row, y) => row.map((color, x) => ({ x, y, color }))).filter(pixel => pixel.color !== '#FFFFFF')
+      pixels: userPixels
     })
   });
+  if (response.status !== 200) {
+    const errorText = await response.text();
+    alert(`Error saving pixels: ${errorText}`);
+    document.getElementById('saveButton').innerText = `Save ${totalPainted}/10 Pixels`;
+    return;
+  }
   totalPainted = 0;
   document.getElementById('saveButton').innerText = `Saved! Wait 5:00 min`;
   document.getElementById('saveButton').disabled = true;
-  let countdown = setInterval(() => {
-    timeout--;
-    document.getElementById('saveButton').innerText = `Saved! Wait ${Math.floor(timeout / 60)}:${(timeout % 60).toString().padStart(2, '0')} min`;
-    if (timeout <= 0) {
-      document.getElementById('saveButton').innerText = `Save 0/10 Pixels`;
-      document.getElementById('saveButton').disabled = false;
-      clearInterval(countdown);
-    }
-  }, 1000); // 1 second
+  saved = true;
+  startTimeoutTimer();
 } 
+
+function cancelPixels() {
+  userPixels = [];
+  totalPainted = 0;
+  document.getElementById('saveButton').innerText = `Save 0/10 Pixels`;
+  document.getElementById('saveButton').disabled = true;
+  document.getElementById('cancelButton').style.display = 'none';
+  redrawCanvas();
+}
 
 // Get an array of colors for the color options
 function getColorArray() {
@@ -169,7 +229,7 @@ function populateColorOptions() {
 }
 
 function mount() {
-  // loadCanvas()
+  loadCanvas()
   redrawCanvas();
   populateColorOptions();
 }

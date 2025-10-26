@@ -1,6 +1,13 @@
 {
   "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
+    "datapantry": "^0.1.2",
     "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "dotenv": "^17.2.3"
   }
 }

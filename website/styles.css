@@ -50,22 +50,38 @@ canvas {
   cursor: none;
 }
 
-#saveButton {
+#saveButton, #cancelButton {
   position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
   padding: 10px 20px;
   background-color: #4444aa;
   color: white;
   border: none;
   border-radius: 15px;
   cursor: pointer;
+  font-weight: bold;
 }
-#saveButton:hover:not(:disabled) {
+#saveButton {
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 180px;
+}
+#cancelButton {
+  bottom: 20px;
+  left: calc(50% + 100px);
+  padding: 0px;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  /* display: flex; */  /*  Set using JS. "none" by default  */
+  align-items: center;
+  justify-content: center;
+}
+#saveButton:hover:not(:disabled), #cancelButton:hover:not(:disabled) {
   background-color: #6666cc;
 }
-#saveButton:disabled {
+#saveButton:disabled, #cancelButton:disabled {
   background-color: #9898ac;
   cursor: not-allowed;
 }
