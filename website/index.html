@@ -19,7 +19,9 @@
     <button id="cancelButton" onclick="cancelPixels()" style="display: none;">
       &#10006;<!--  ✖  -->
     </button>
-    <canvas id="pixelCanvas" width="1000" height="1000"></canvas>
+    <div id="canvasContainer">
+      <canvas id="pixelCanvas" width="1000" height="1000"></canvas>
+    </div>
   </main>
 </body>
 <script>
@@ -35,6 +37,11 @@ let totalPainted = 0; // Total pixels painted, out of 10 limit
 let timeout = 0;
 let userPixels = []; // pixels painted by user
 let saved = false; // recently saved by the user
+let zoom = 1;
+let pan = { x: 0, y: 0 };
+const panLimits = { x: 500, y: 500 }; // max pan in each direction
+let mousedown = false;
+let previousMousePos = { x: 0, y: 0 };
 
 // Initialize grid
 let grid = [];
@@ -87,14 +94,66 @@ function redrawCanvas() {
   });
 }
 
+// Function to update canvas transform
+function updateCanvasTransform() {
+  canvas.style.transform = `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`;
+}
+
+window.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  zoom += e.deltaY * -0.001;
+  zoom = Math.min(Math.max(1, zoom), 10);
+  updateCanvasTransform();
+});
+
+// Used for panning. To draw pixels, see click event
+window.addEventListener('mousedown', (e) => {
+  mousedown = true;
+});
+
+window.addEventListener('mouseup', (e) => {
+  mousedown = false;
+});
+
+window.addEventListener('mouseleave', (e) => {
+  mousedown = false;
+});
+
+ //  Handle panning
+window.addEventListener('mousemove', (e) => {
+  if (mousedown) {
+    const deltaX = e.clientX - previousMousePos.x;
+    const deltaY = e.clientY - previousMousePos.y;
+    if (Math.abs(pan.x + deltaX) > panLimits.x) {
+      deltaX = 0;
+    }
+    if (Math.abs(pan.y + deltaY) > panLimits.y) {
+      deltaY = 0;
+    }
+    pan.x += deltaX;
+    pan.y += deltaY;
+    updateCanvasTransform();
+    previousMousePos = { x: e.clientX, y: e.clientY };
+    return; // Skip hover drawing while panning
+  }
+  previousMousePos = { x: e.clientX, y: e.clientY };
+});
 
 //  hover effect
 canvas.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect()
+
+  // Account for scaling when calculating pixel coordinates
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  //  x and y coord of the mouse (in pixels)
   const x = Math.floor((e.clientX - rect.left) / PIXEL_SIZE)
   const y = Math.floor((e.clientY - rect.top) / PIXEL_SIZE)
   
+  //  Drawing the hover outline
   if (hoveredPixel?.x !== x || hoveredPixel?.y !== y) {
+
     // Redraw old hovered pixel (remove outline)
     let color = getPixelColor(x, y);
     if (hoveredPixel) {
@@ -137,9 +196,6 @@ canvas.addEventListener('click', async (e) => {
   document.getElementById('saveButton').disabled = false;
   document.getElementById('saveButton').innerText = `Save ${totalPainted}/10 Pixels`;
   document.getElementById('cancelButton').style.display = 'flex';
-  return;
-  // Save to DataPantry
-  
 });
 
 // Start timeout timer
