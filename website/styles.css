@@ -24,26 +24,14 @@ main {
   overflow: hidden;
 }
 
-#canvasContainer {
+#pixelCanvas {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  image-rendering: pixelated;
-  z-index: 1
-}
-
-#pixelCanvas {
-  position: absolute;
-  min-height: 100vh;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   image-rendering: pixelated;
   cursor: crosshair;
   z-index: 1;
+  transform-origin: 0 0; /* Important: scale from top-left */
 }
 
 #toolbar {

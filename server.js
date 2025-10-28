@@ -95,6 +95,13 @@ app.post('/api/save-pixel', async (req, res) => {
     return;
   }
 
+  //  Make sure the user is submitting 10 or fewer pixels
+  if (!pixels || !Array.isArray(pixels) || pixels.length === 0 || pixels.length > 10) {
+    console.log(`Invalid pixel submission from IP ${hashedIP}:`, pixels);
+    res.status(400).send('Invalid pixel submission. You can submit between 1 and 10 pixels at a time.');
+    return;
+  }
+
   //  Format the pixel data for insertion
   pixels.forEach((pixel) => {
     pixel.ip = hashedIP

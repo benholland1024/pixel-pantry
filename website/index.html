@@ -19,17 +19,19 @@
     <button id="cancelButton" onclick="cancelPixels()" style="display: none;">
       &#10006;<!--  ✖  -->
     </button>
-    <div id="canvasContainer">
-      <canvas id="pixelCanvas" width="1000" height="1000"></canvas>
-    </div>
+    <canvas id="pixelCanvas"></canvas>
   </main>
 </body>
+
 <script>
+
 const canvas = document.getElementById('pixelCanvas');
 const ctx = canvas.getContext('2d');
+canvas.width = 1000;
+canvas.height = 1000;
 const GRID_SIZE = 100;
 const PIXEL_SIZE = canvas.width / GRID_SIZE;
-
+const MAX_DRAW_PER_SESSION = 10;
 
 let hoveredPixel = null; // Hover pixel tracking
 let selectedColor = `hsl(0, 0%, 0%)`; // color to draw, default black
@@ -38,10 +40,15 @@ let timeout = 0;
 let userPixels = []; // pixels painted by user
 let saved = false; // recently saved by the user
 let zoom = 1;
-let pan = { x: 0, y: 0 };
-const panLimits = { x: 500, y: 500 }; // max pan in each direction
+let pan = {
+  x: (window.innerWidth - canvas.width) / 2, // Start centered
+  y: 0
+};
 let mousedown = false;
-let previousMousePos = { x: 0, y: 0 };
+let previousMousePos = {
+  x: 0,
+  y: 0 
+};
 
 // Initialize grid
 let grid = [];
@@ -83,6 +90,8 @@ async function loadCanvas() {
     }
   })
   timeout = res.waitTime || 0;
+
+  updateCanvasTransform();
   redrawCanvas();
   startTimeoutTimer();
 }
@@ -96,13 +105,41 @@ function redrawCanvas() {
 
 // Function to update canvas transform
 function updateCanvasTransform() {
-  canvas.style.transform = `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`;
+  canvas.style.transform = `scale(${zoom})`;
+  canvas.style.left = `${pan.x}px`;
+  canvas.style.top = `${pan.y}px`;
 }
 
 window.addEventListener('wheel', (e) => {
   e.preventDefault();
+  
+  const oldZoom = zoom;
   zoom += e.deltaY * -0.001;
   zoom = Math.min(Math.max(1, zoom), 10);
+  
+  if (zoom === oldZoom) return; // No change, skip calculations
+  
+  // Get mouse position in viewport
+  const mouseViewportX = e.clientX;
+  const mouseViewportY = e.clientY;
+  
+  // Get canvas position in viewport BEFORE zoom
+  const rect = canvas.getBoundingClientRect();
+  
+  // Calculate which point on the canvas (in canvas pixels) is under the mouse
+  const canvasPointX = (mouseViewportX - rect.left) / oldZoom;
+  const canvasPointY = (mouseViewportY - rect.top) / oldZoom;
+  
+  // After zoom, we want this same canvas point to be under the mouse
+  // So we solve: mouseViewportX = (canvasPointX * zoom) + newCanvasLeft
+  // Therefore: newCanvasLeft = mouseViewportX - (canvasPointX * zoom)
+  const newCanvasLeft = mouseViewportX - (canvasPointX * zoom);
+  const newCanvasTop = mouseViewportY - (canvasPointY * zoom);
+  
+  // Update pan (remember, pan.x/y are the left/top positions of the canvas)
+  pan.x = newCanvasLeft;
+  pan.y = newCanvasTop;
+  
   updateCanvasTransform();
 });
 
@@ -119,11 +156,26 @@ window.addEventListener('mouseleave', (e) => {
   mousedown = false;
 });
 
+function getPanLimits() {
+  const canvasSize = 1000; // Your canvas width/height
+  const viewportSize = Math.min(window.innerWidth, window.innerHeight);
+  const scaledCanvasSize = canvasSize * zoom;
+  
+  // Allow panning 3x the canvas size
+  const maxPan = Math.max(0, (scaledCanvasSize * 3 - viewportSize) / 2);
+  
+  return {
+    x: maxPan,
+    y: maxPan
+  };
+}
+
  //  Handle panning
 window.addEventListener('mousemove', (e) => {
   if (mousedown) {
-    const deltaX = e.clientX - previousMousePos.x;
-    const deltaY = e.clientY - previousMousePos.y;
+    let deltaX = e.clientX - previousMousePos.x;
+    let deltaY = e.clientY - previousMousePos.y;
+    const panLimits = getPanLimits();
     if (Math.abs(pan.x + deltaX) > panLimits.x) {
       deltaX = 0;
     }
@@ -148,13 +200,13 @@ canvas.addEventListener('mousemove', (e) => {
   const scaleY = canvas.height / rect.height;
 
   //  x and y coord of the mouse (in pixels)
-  const x = Math.floor((e.clientX - rect.left) / PIXEL_SIZE)
-  const y = Math.floor((e.clientY - rect.top) / PIXEL_SIZE)
+  const x = Math.floor(((e.clientX - rect.left) * scaleX) / PIXEL_SIZE);
+  const y = Math.floor(((e.clientY - rect.top) * scaleY) / PIXEL_SIZE);
   
   //  Drawing the hover outline
   if (hoveredPixel?.x !== x || hoveredPixel?.y !== y) {
 
-    // Redraw old hovered pixel (remove outline)
+    // Redraw old hovered pixel (rfemove outline)
     let color = getPixelColor(x, y);
     if (hoveredPixel) {
       let userPixel = userPixels.find(p => p.x === hoveredPixel.x && p.y === hoveredPixel.y);
@@ -188,7 +240,7 @@ canvas.addEventListener('mouseout', (e) => {
 
 //  draw on click
 canvas.addEventListener('click', async (e) => {
-  if (!hoveredPixel || totalPainted >= 10 || timeout > 0) return;
+  if (!hoveredPixel || totalPainted >= MAX_DRAW_PER_SESSION || timeout > 0) return;
   const { x, y } = hoveredPixel;
   userPixels.push({ x, y, color: selectedColor });
   drawPixel(x, y, selectedColor);
@@ -216,7 +268,6 @@ function startTimeoutTimer() {
 async function savePixels() {
   document.getElementById('saveButton').innerText = `Saving...`;
   console.log('Saving pixels:', userPixels);
-  // return;
   timeout = 5 * 60; // 5 minutes in seconds
   const response = await fetch('/api/save-pixel', {
     method: 'POST',
@@ -237,6 +288,12 @@ async function savePixels() {
   document.getElementById('saveButton').innerText = `Saved! Wait 5:00 min`;
   document.getElementById('saveButton').disabled = true;
   saved = true;
+  for (let i = 0; i < userPixels.length; i++) {
+    const pixel = userPixels[i];
+    const index = grid.findIndex(p => p.x === pixel.x && p.y === pixel.y);
+    grid[index].color = pixel.color;
+  }
+  userPixels = [];
   startTimeoutTimer();
 } 
 
