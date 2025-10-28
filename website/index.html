@@ -49,6 +49,9 @@ let previousMousePos = {
   x: 0,
   y: 0 
 };
+let touchStartDistance = null; // For pinch zoom
+let touchStartZoom = null;
+let touchStartPan = null;
 
 // Initialize grid
 let grid = [];
@@ -248,6 +251,109 @@ canvas.addEventListener('click', async (e) => {
   document.getElementById('saveButton').disabled = false;
   document.getElementById('saveButton').innerText = `Save ${totalPainted}/10 Pixels`;
   document.getElementById('cancelButton').style.display = 'flex';
+});
+
+// Touch event handlers for mobile
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  
+  if (e.touches.length === 1) {
+    // Single finger - start panning
+    mousedown = true;
+    previousMousePos = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY
+    };
+  } else if (e.touches.length === 2) {
+    // Two fingers - start pinch zoom
+    mousedown = false;
+    const touch1 = e.touches[0];
+    const touch2 = e.touches[1];
+    touchStartDistance = Math.hypot(
+      touch2.clientX - touch1.clientX,
+      touch2.clientY - touch1.clientY
+    );
+    touchStartZoom = zoom;
+    touchStartPan = { ...pan };
+  }
+});
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  
+  if (e.touches.length === 1 && mousedown) {
+    // Single finger - pan
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - previousMousePos.x;
+    const deltaY = touch.clientY - previousMousePos.y;
+    
+    pan.x += deltaX;
+    pan.y += deltaY;
+    
+    previousMousePos = {
+      x: touch.clientX,
+      y: touch.clientY
+    };
+    
+    updateCanvasTransform();
+  } else if (e.touches.length === 2) {
+    // Two fingers - pinch zoom
+    const touch1 = e.touches[0];
+    const touch2 = e.touches[1];
+    
+    const currentDistance = Math.hypot(
+      touch2.clientX - touch1.clientX,
+      touch2.clientY - touch1.clientY
+    );
+    
+    // Calculate center point between two fingers
+    const centerX = (touch1.clientX + touch2.clientX) / 2;
+    const centerY = (touch1.clientY + touch2.clientY) / 2;
+    
+    // Calculate new zoom
+    const oldZoom = zoom;
+    zoom = touchStartZoom * (currentDistance / touchStartDistance);
+    zoom = Math.min(Math.max(1, zoom), 10);
+    
+    // Get canvas position before zoom
+    const rect = canvas.getBoundingClientRect();
+    
+    // Calculate which point on canvas is at the pinch center
+    const canvasPointX = (centerX - rect.left) / oldZoom;
+    const canvasPointY = (centerY - rect.top) / oldZoom;
+    
+    // Adjust pan to keep the pinch center fixed
+    pan.x = centerX - (canvasPointX * zoom);
+    pan.y = centerY - (canvasPointY * zoom);
+    
+    updateCanvasTransform();
+  }
+});
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  
+  if (e.touches.length === 0) {
+    mousedown = false;
+    touchStartDistance = null;
+    touchStartZoom = null;
+    touchStartPan = null;
+  } else if (e.touches.length === 1) {
+    // Went from 2 fingers to 1, restart panning
+    mousedown = true;
+    previousMousePos = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY
+    };
+    touchStartDistance = null;
+  }
+});
+
+canvas.addEventListener('touchcancel', (e) => {
+  mousedown = false;
+  touchStartDistance = null;
+  touchStartZoom = null;
+  touchStartPan = null;
 });
 
 // Start timeout timer
