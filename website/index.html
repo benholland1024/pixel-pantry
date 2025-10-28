@@ -15,6 +15,21 @@
       <label for="colorPicker">Choose Color:</label>
       <div id="colorDisplay"><!--  Color options added here  --></div>
     </div>
+    <div id="infoIcon" onclick="toggleInfoBox(true)">
+      i
+    </div>
+    <div id="infoBox">
+      <h2>How to Use Pixel Pantry</h2>
+      <ul>
+        <li>Click on the canvas to place pixels (max 10 per session).</li>
+        <li>Select your desired color from the color palette.</li>
+        <li>Use mouse wheel or pinch gesture to zoom in/out.</li>
+        <li>Click and drag (or use one finger on mobile) to pan around the canvas.</li>
+        <li>After placing pixels, click "Save" to submit your changes.</li>
+        <li>Wait time may apply between sessions.</li>
+      </ul>
+      <button onclick="toggleInfoBox(false)">Close</button>
+    </div>
     <button id="saveButton" disabled onclick="savePixels()">Loading...</button>
     <button id="cancelButton" onclick="cancelPixels()" style="display: none;">
       &#10006;<!--  ✖  -->
@@ -248,6 +263,7 @@ canvas.addEventListener('click', async (e) => {
   userPixels.push({ x, y, color: selectedColor });
   drawPixel(x, y, selectedColor);
   totalPainted++;
+  toggleInfoBox(false);
   document.getElementById('saveButton').disabled = false;
   document.getElementById('saveButton').innerText = `Save ${totalPainted}/10 Pixels`;
   document.getElementById('cancelButton').style.display = 'flex';
@@ -447,6 +463,11 @@ function populateColorOptions() {
 
     colorDisplay.appendChild(colorDiv)
   })
+}
+
+function toggleInfoBox(makeVisible = false) {
+  document.getElementById('infoBox').style.display = makeVisible ? 'block' : 'none';
+  document.getElementById('infoIcon').style.display = makeVisible ? 'none' : 'block';
 }
 
 function mount() {
