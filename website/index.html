@@ -254,6 +254,7 @@ canvas.addEventListener('click', async (e) => {
 function startTimeoutTimer() {
   let countdown = setInterval(() => {
     timeout--;
+    document.getElementById('cancelButton').style.display = 'none';
     if (timeout <= 0) {
       document.getElementById('saveButton').innerText = `Save 0/10 Pixels`;
       clearInterval(countdown);
@@ -267,6 +268,7 @@ function startTimeoutTimer() {
 // Save pixels to server
 async function savePixels() {
   document.getElementById('saveButton').innerText = `Saving...`;
+  document.getElementById('cancelButton').style.display = 'none';
   console.log('Saving pixels:', userPixels);
   timeout = 5 * 60; // 5 minutes in seconds
   const response = await fetch('/api/save-pixel', {
