@@ -94,6 +94,10 @@ main {
   font-size: 16px;
   cursor: pointer;
 }
+#infoBox a, #infoBox a:visited {
+  color: #d1d1ff;
+  font-weight: bold;
+}
 
 .colorOption {
   width: 25px;
