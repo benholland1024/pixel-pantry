@@ -58,6 +58,7 @@ const MAX_DRAW_PER_SESSION = 10;
 let hoveredPixel = null; // Hover pixel tracking
 let selectedColor = `hsl(0, 0%, 0%)`; // color to draw, default black
 let totalPainted = 0; // Total pixels painted, out of 10 limit
+let startTimeoutTime = null;
 let timeout = 0;
 let userPixels = []; // pixels painted by user
 let saved = false; // recently saved by the user
@@ -379,10 +380,23 @@ canvas.addEventListener('touchcancel', (e) => {
   touchStartPan = null;
 });
 
+// Redraw canvas when revisiting page, to prevent blank canvas
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) {
+    redrawCanvas();
+    userPixels.forEach(pixel => {
+      drawPixel(pixel.x, pixel.y, pixel.color);
+    });
+  }
+});
+
 // Start timeout timer
 function startTimeoutTimer() {
+  startTimeoutTime = Date.now();
   let countdown = setInterval(() => {
-    timeout--;
+    const elapsed = Math.floor((Date.now() - startTimeoutTime) / 1000);
+    timeout = Math.max(0, timeout - elapsed);
+    startTimeoutTime = Date.now();
     document.getElementById('cancelButton').style.display = 'none';
     if (timeout <= 0) {
       document.getElementById('saveButton').innerText = `Save 0/10 Pixels`;
@@ -482,6 +496,9 @@ function mount() {
   redrawCanvas();
   populateColorOptions();
 }
+
+
+
 mount();
 </script>
 </html>
