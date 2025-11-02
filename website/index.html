@@ -72,6 +72,7 @@ let previousMousePos = {
   x: 0,
   y: 0 
 };
+let moveDistance = 0; // If high enough, don't draw a pixel. 
 let touchStartDistance = null; // For pinch zoom
 let touchStartZoom = null;
 let touchStartPan = null;
@@ -171,6 +172,7 @@ window.addEventListener('wheel', (e) => {
 
 // Used for panning. To draw pixels, see click event
 window.addEventListener('mousedown', (e) => {
+  moveDistance = 0;
   mousedown = true;
 });
 
@@ -210,6 +212,7 @@ window.addEventListener('mousemove', (e) => {
     }
     pan.x += deltaX;
     pan.y += deltaY;
+    moveDistance += Math.hypot(deltaX, deltaY);
     updateCanvasTransform();
     previousMousePos = { x: e.clientX, y: e.clientY };
     return; // Skip hover drawing while panning
@@ -267,6 +270,7 @@ canvas.addEventListener('mouseout', (e) => {
 //  draw on click
 canvas.addEventListener('click', async (e) => {
   if (!hoveredPixel || totalPainted >= MAX_DRAW_PER_SESSION || timeout > 0) return;
+  if (moveDistance > 5) return; // If user moved mouse significantly, don't draw
   const { x, y } = hoveredPixel;
   userPixels.push({ x, y, color: selectedColor });
   drawPixel(x, y, selectedColor);
